@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MedConnect NZ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Layout: one question per screen with a live "answers so far" side panel; answer sheet mirrors the Figma wireframes. */
+:root{
+  --bg:#F6F6F3; --surface:#FFFFFF; --ink:#1F1F1D; --mute:#5C5C57; --line:#D5D5CE; --soft:#E9E9E4;
+  --accent:#1556B0; --tint:#EAF1FB; --on-accent:#FFFFFF;
+  --ok:#1A6B3C; --ok-bg:#DDF2E4; --bad:#A32222; --bad-bg:#FBE3E3; --unk:#80560A; --unk-bg:#FCF0CB;
+  --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141413; --surface:#1E1E1C; --ink:#EDEDE8; --mute:#A6A69E; --line:#3B3B37; --soft:#2A2A27;
+  --accent:#8DB4F4; --tint:#1C2740; --on-accent:#0B1A33;
+  --ok:#7FD59E; --ok-bg:#183524; --bad:#F29A9A; --bad-bg:#3D1C1C; --unk:#EBC76A; --unk-bg:#3A2E10; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141413; --surface:#1E1E1C; --ink:#EDEDE8; --mute:#A6A69E; --line:#3B3B37; --soft:#2A2A27;
+  --accent:#8DB4F4; --tint:#1C2740; --on-accent:#0B1A33;
+  --ok:#7FD59E; --ok-bg:#183524; --bad:#F29A9A; --bad-bg:#3D1C1C; --unk:#EBC76A; --unk-bg:#3A2E10; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.5;padding-inline:16px}
+header.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;max-width:1120px;margin:0 auto;padding-block:16px}
+.logo{font-weight:700;font-size:20px;background:none;border:0;color:var(--ink);cursor:pointer;padding:0;font-family:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding-block:16px 56px;display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+main{flex:999 1 520px;min-width:0}
+aside{flex:1 1 280px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px}
+h1{font-size:clamp(26px,4vw,36px);line-height:1.18;margin:0 0 12px;text-wrap:balance}
+h2{font-size:22px;margin:0 0 12px}
+h3{font-size:18px;margin:0 0 8px}
+p{margin:0 0 12px;max-width:68ch}
+.mute{color:var(--mute)}
+.small{font-size:14px}
+.eyebrow{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 8px;font-weight:600}
+button,select,input{font:inherit;color:inherit}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 24px;border:2px solid var(--accent);border-radius:8px;background:var(--surface);color:var(--accent);font-weight:600;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.small{min-height:40px;padding:0 14px;font-size:15px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,.link:focus-visible,.choice:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.link{background:none;border:0;color:var(--accent);font-weight:600;cursor:pointer;padding:4px 0;font-family:inherit}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.progress{height:10px;background:var(--soft);border-radius:5px;margin:0 0 28px;overflow:hidden}
+.progress>div{height:100%;background:var(--accent);border-radius:5px;transition:width .25s}
+label.field{display:block;font-weight:600;margin-bottom:6px}
+select,input[type=number],input[type=text],input[type=month]{min-height:48px;padding:0 12px;border:2px solid var(--accent);border-radius:8px;background:var(--tint);width:100%;max-width:420px}
+input[type=number]{max-width:170px}
+.scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;max-width:640px}
+.scores input{max-width:none}
+.choices{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.choice{min-height:48px;padding:0 22px;border:2px solid var(--accent);border-radius:8px;background:var(--surface);color:var(--accent);font-weight:600;cursor:pointer}
+.choice[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.check{display:inline-flex;gap:10px;align-items:center;min-height:44px;cursor:pointer}
+.check input{width:22px;height:22px;accent-color:var(--accent)}
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 16px;margin:24px 0;max-width:640px}
+summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--accent);font-weight:600}
+.err{color:var(--bad);font-size:14px;min-height:20px;margin:6px 0 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:24px 0}
+.ans{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-top:1px solid var(--soft)}
+.ans .q{display:block;font-size:13px;color:var(--mute)}
+.ans .v{overflow-wrap:anywhere}
+.side-list{max-height:60vh;overflow:auto}
+.pill{display:inline-flex;gap:6px;align-items:center;padding:3px 12px;border-radius:20px;font-size:14px;font-weight:600;white-space:nowrap}
+.pill.doc{background:var(--ok-bg);color:var(--ok)}
+.pill.mis{background:var(--bad-bg);color:var(--bad)}
+.pill.unk{background:var(--unk-bg);color:var(--unk)}
+.pill.na{background:var(--soft);color:var(--mute)}
+.hero{border:2px solid var(--accent);background:var(--tint);border-radius:14px;padding:24px;margin:0 0 24px}
+.hero h2{font-size:clamp(24px,3.5vw,32px);margin:0 0 8px}
+.table{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:28px}
+.trow{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:center;padding:14px 18px;border-top:1px solid var(--soft)}
+.trow:first-child{border-top:0}
+.trow .t{flex:1 1 320px;min-width:0}
+.trow .n{display:block;font-size:14px;color:var(--mute)}
+.road{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:28px}
+.col{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.col h3{color:var(--accent)}
+.task{display:flex;gap:12px;align-items:flex-start;background:var(--bg);border-radius:8px;padding:12px;margin-top:10px}
+.task input{width:22px;height:22px;margin-top:2px;accent-color:var(--accent);flex:none}
+.task label{cursor:pointer;min-width:0}
+.task b{display:block;font-weight:600}
+.task span{font-size:14px;color:var(--mute)}
+.task input:checked+label b{text-decoration:line-through;color:var(--mute)}
+.disc{background:var(--soft);border-radius:10px;padding:16px;font-size:15px}
+.stop{border:2px solid var(--bad);background:var(--bad-bg);color:var(--ink);border-radius:12px;padding:24px}
+.toast{color:var(--mute);font-size:14px;min-height:20px}
+@media (prefers-reduced-motion:reduce){.progress>div{transition:none}}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;margin-inline:-16px;padding-inline:16px;background:var(--bg);border-bottom:1px solid var(--line)}
+.nav{display:flex;flex-wrap:wrap;gap:4px}
+.nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:600;font-size:15px}
+.nav a:hover{background:var(--soft)}
+.nav a[aria-current="page"]{background:var(--tint);color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.nav a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.page{max-width:1120px;margin:0 auto;padding-block:32px 64px}
+.band{margin-inline:-16px;padding:52px 16px;background:var(--surface);border-block:1px solid var(--line)}
+.band>.in,.band2>.in{max-width:1120px;margin:0 auto}
+.band2{margin-inline:-16px;padding:52px 16px}
+.hero2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:48px;align-items:center;padding-block:40px 56px}
+.hero2 h1{font-size:clamp(34px,5.6vw,58px);line-height:1.06;letter-spacing:-.025em;margin:0 0 20px}
+.hero2 .lede{font-size:clamp(17px,2vw,20px);color:var(--mute);max-width:56ch}
+.meta{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14px;color:var(--mute)}
+.meta span::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:8px;vertical-align:middle}
+.peek{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 18px 50px rgba(20,30,50,.10)}
+.peek .tag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:14px}
+.peek .r{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:11px 0;border-top:1px solid var(--soft);font-size:15px}
+.peek .r span:first-child{min-width:0}
+.peek .out{margin-top:14px;padding:16px;border-radius:12px;background:var(--tint);border:2px solid var(--accent)}
+.peek .out b{display:block;font-size:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:16px}
+.cardbtn{text-align:left;display:block;width:100%;padding:20px;border:2px solid var(--accent);border-radius:12px;background:var(--tint);color:var(--ink);cursor:pointer;font-family:inherit}
+.cardbtn:hover{background:var(--surface)}
+.cardbtn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.cardbtn b{display:block;font-size:18px;color:var(--accent);margin-bottom:4px}
+.cardbtn span{font-size:14px;color:var(--mute)}
+.sec-h{max-width:68ch;margin-bottom:24px}
+.sec-h h2{font-size:clamp(26px,3.6vw,36px);line-height:1.15;letter-spacing:-.015em;margin:0 0 8px;text-wrap:balance}
+.stepn{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-weight:700;margin-bottom:12px}
+.resume{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;background:var(--tint);border:2px solid var(--accent);border-radius:14px;padding:20px 24px;margin-bottom:32px}
+.cta{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;background:var(--accent);color:var(--on-accent);border-radius:18px;padding:32px}
+.cta h2{margin:0 0 6px;font-size:clamp(24px,3vw,32px)}
+.cta p{margin:0;opacity:.9}
+.cta .btn{background:var(--surface);color:var(--accent);border-color:var(--surface)}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.guide{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px}
+.guide h3{font-size:22px}
+.guide ul,.page ul.list{margin:0 0 14px;padding-left:20px;max-width:68ch}
+.guide li,.page ul.list li{margin-bottom:6px}
+.route{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;min-width:0}
+.route h3{font-size:20px;color:var(--accent)}
+.route dt{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);font-weight:700;margin-top:12px}
+.route dd{margin:2px 0 0}
+.faq details{margin:8px 0;max-width:none}
+.src td,.src th{padding:10px 14px;text-align:left;border-top:1px solid var(--soft);vertical-align:top}
+.src table{border-collapse:collapse;width:100%;min-width:520px}
+.src{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+.src th{font-size:13px;color:var(--mute);border-top:0}
+.rescard{display:block;padding:18px 20px;border:2px solid var(--accent);border-radius:12px;background:var(--tint);color:var(--ink);text-decoration:none;min-width:0}
+.rescard:hover{background:var(--surface)}
+.rescard:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.rescard b{display:block;color:var(--accent);font-size:17px}
+.rescard span{font-size:14px;color:var(--mute)}
+.filters{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:20px 0 32px}
+.restopic{margin-bottom:36px}
+.restopic h2{margin-bottom:4px}
+footer.site{margin-inline:-16px;padding:32px 16px;background:var(--ink);color:var(--bg);font-size:14px}
+footer.site .in{max-width:1120px;margin:0 auto}
+footer.site a,footer.site button{color:var(--bg);background:none;border:0;font:inherit;text-decoration:underline;cursor:pointer;padding:0}
+footer.site .links{display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:12px}
+</style>
+
+<div class="topbar">
+<header class="top" style="padding-block:8px">
+  <a class="logo" id="logo" href="#home" data-go="home" style="text-decoration:none">MedConnect NZ</a>
+  <nav class="nav" aria-label="Main">
+    <a href="#home" data-go="home">Home</a>
+    <a href="#check" data-go="check">Check my pathway</a>
+    <a href="#pathways" data-go="pathways">Pathways</a>
+    <a href="#resources" data-go="resources">Resources</a>
+    <a href="#about" data-go="about">About and help</a>
+  </nav>
+</header>
+</div>
+
+<div data-page="home">
+ <div class="page" style="padding-bottom:0">
+  <div class="resume" id="resume" hidden>
+    <div><b style="font-size:18px">Welcome back</b><p class="mute" style="margin:0">Your answers are still in this tab.</p></div>
+    <button class="btn primary" id="resumeBtn" type="button" data-go="check" data-sheet>Open my answer sheet</button>
+  </div>
+  <section class="hero2">
+   <div>
+    <p class="eyebrow">For doctors moving to New Zealand</p>
+    <h1>Know your route to practising medicine in New Zealand before you apply</h1>
+    <p class="lede">Answer a few questions about your degree, recent work, English and exams. MedConnect NZ shows the registration pathway that fits, checks each requirement against Medical Council rules, and gives you a task list in the order to do things.</p>
+    <div class="row" style="margin-top:26px">
+      <button class="btn primary" type="button" data-go="check" data-start>Start the check</button>
+      <button class="btn" type="button" data-go="pathways">See the pathways</button>
+    </div>
+    <div class="meta"><span>22 questions</span><span>About 5 minutes</span><span>No account</span><span>Answers stay in your browser</span></div>
+   </div>
+   <div class="peek" aria-label="Example answer sheet">
+    <span class="tag">Example answer sheet</span>
+    <div class="r"><span>Primary medical degree</span><span class="pill doc">✓ Documented</span></div>
+    <div class="r"><span>Recent practice, 33 of 48 months</span><span class="pill unk">? Unknown</span></div>
+    <div class="r"><span>English test scores</span><span class="pill mis">✕ Mismatch</span></div>
+    <div class="r"><span>Supervised NZ job offer</span><span class="pill unk">? Unknown</span></div>
+    <div class="out"><span class="small mute">Most likely pathway</span><b>NZREX Clinical route</b><span class="small mute">Next task: book an English test</span></div>
+   </div>
+  </section>
+ </div>
+
+ <div class="band"><div class="in">
+  <div class="sec-h"><h2>Three steps to a clear plan</h2><p class="mute">Most doctors know the rules exist. The hard part is working out which ones apply to them.</p></div>
+  <div class="grid">
+   <div class="card"><span class="stepn">1</span><h3>Answer questions</h3><p class="mute" style="margin:0">Your degree, recent practice, English and exams. One question per screen, with a plain explanation of why each one matters.</p></div>
+   <div class="card"><span class="stepn">2</span><h3>See your pathway</h3><p class="mute" style="margin:0">Each requirement is marked Documented, Mismatch or Unknown. Unknown is never treated as a pass.</p></div>
+   <div class="card"><span class="stepn">3</span><h3>Follow your task list</h3><p class="mute" style="margin:0">Tests and steps in order: Do now, Next, Later. Save the whole answer sheet as a PDF.</p></div>
+  </div>
+ </div></div>
+
+ <div class="band2"><div class="in">
+  <div class="sec-h"><h2>Where the routes split</h2><p class="mute">Which route you get depends mainly on where you have practised recently and whether your degree and English are verified.</p></div>
+  <div class="grid">
+   <div class="route"><h3>Comparable health system</h3><p class="mute" style="margin:0 0 10px">For doctors with recent practice in one of 29 countries with a comparable health system.</p><button class="link" type="button" data-go="pathways">How it works</button></div>
+   <div class="route"><h3>NZREX Clinical</h3><p class="mute" style="margin:0 0 10px">The exam route for doctors who do not meet another pathway, followed by supervised practice.</p><button class="link" type="button" data-go="pathways">How it works</button></div>
+   <div class="route"><h3>General practice routes</h3><p class="mute" style="margin:0 0 10px">GP training and fellowship routes through the Royal New Zealand College of General Practitioners.</p><button class="link" type="button" data-go="pathways">How it works</button></div>
+  </div>
+ </div></div>
+
+ <div class="band"><div class="in">
+  <div class="sec-h"><h2>Where are you coming from?</h2><p class="mute">Optional. Each card opens a short guide for doctors from that background.</p></div>
+  <div class="grid">
+   <button class="cardbtn" type="button" data-go="pathways" data-sub="china"><b>China</b><span>Guide for doctors trained in China</span></button>
+   <button class="cardbtn" type="button" data-go="pathways" data-sub="india"><b>India</b><span>Guide for doctors trained in India</span></button>
+   <button class="cardbtn" type="button" data-go="pathways" data-sub="usa"><b>USA and Canada</b><span>Guide including the GP fast-track</span></button>
+   <button class="cardbtn" type="button" data-go="pathways" data-sub="europe"><b>Europe, UK and Ireland</b><span>Guide for European-trained doctors</span></button>
+  </div>
+ </div></div>
+
+ <div class="band2"><div class="in">
+  <div class="sec-h"><h2>Built on official sources</h2><p>Every requirement comes from the Medical Council of New Zealand, the Royal New Zealand College of General Practitioners or the World Directory of Medical Schools. The Sources section on the About page lists each one with the date we last checked it.</p></div>
+  <div class="cta"><div><h2>Ready to find your route?</h2><p>It takes about five minutes and you can change any answer.</p></div><button class="btn" type="button" data-go="check" data-start>Start the check</button></div>
+ </div></div>
+</div>
+
+<div data-page="check" hidden><div class="wrap" id="app"></div></div>
+
+<div data-page="pathways" hidden><div class="page">
+  <p class="eyebrow">Pathways</p>
+  <h1>The routes to registration in New Zealand</h1>
+  <p class="mute">The Medical Council of New Zealand (MCNZ) decides which route applies to you. These summaries explain the main routes so the questions make sense. Last checked October 2026.</p>
+  <div class="grid" style="margin:28px 0 12px">
+   <div class="route"><h3>Comparable health system pathway</h3>
+    <dl><dt>Who it is for</dt><dd>Doctors with recent practice in one of 29 countries with a comparable health system.</dd>
+    <dt>Key requirements</dt><dd>At least 33 of the last 48 months practising, 20 or more hours a week, current full registration, and English requirements met.</dd>
+    <dt>Then</dt><dd>Verification of your degree through EPIC and a job offer that includes supervision.</dd></dl></div>
+   <div class="route"><h3>NZREX Clinical route</h3>
+    <dl><dt>Who it is for</dt><dd>Doctors who do not meet another pathway.</dd>
+    <dt>Key requirements</dt><dd>A prerequisite exam (PLAB Part 1, MCCQE Part I, AMC MCQ or USMLE Steps 1 and 2 CK) in the last 5 years, English requirements met, and degree verification.</dd>
+    <dt>Then</dt><dd>Pass NZREX Clinical, then supervised prevocational training in a New Zealand hospital (first and second postgraduate years).</dd></dl></div>
+   <div class="route"><h3>General practice routes</h3>
+    <dl><dt>Who it is for</dt><dd>Doctors who want to work as GPs.</dd>
+    <dt>Options</dt><dd>The GP training programme (GPEP), the Prior Specialist Training Pathway for recognised overseas GP qualifications (Group 1 or Group 2), and a GP fast-track for some GPs from the USA, Canada and Singapore.</dd>
+    <dt>Also ask about</dt><dd>The RNZCGP requirement for current advanced cardiac life support (ACLS) and the NZREX primary care pathway.</dd></dl></div>
+  </div>
+  <p class="mute small">MCNZ also has a competent authority pathway and vocational scope routes for specialists. This tool covers the main general and GP routes.</p>
+
+  <h2 style="margin-top:44px">Guides by country</h2>
+  <p class="mute">Your route depends on where you practised recently, not only where you trained.</p>
+  <div class="tabs" role="group" aria-label="Country guides" id="tabs">
+   <button class="choice" type="button" data-tab="china" aria-pressed="true">China</button>
+   <button class="choice" type="button" data-tab="india" aria-pressed="false">India</button>
+   <button class="choice" type="button" data-tab="usa" aria-pressed="false">USA and Canada</button>
+   <button class="choice" type="button" data-tab="europe" aria-pressed="false">Europe, UK and Ireland</button>
+  </div>
+  <div class="guide" data-guide="china"><h3>Doctors trained in China</h3>
+   <p>China is not on the list of 29 comparable health system countries, so the usual route is NZREX Clinical. If you have practised recently in a country that is on the list, such as Singapore, Hong Kong or the UK, the comparable pathway may apply instead.</p>
+   <ul><li>Check that your medical school and graduation year are covered in the World Directory of Medical Schools.</li><li>Pass a prerequisite exam, for example PLAB Part 1 or USMLE Steps 1 and 2 CK.</li><li>Take IELTS Academic or OET Medicine unless you qualify for an English exemption.</li><li>Start degree verification through EPIC early, because it takes time.</li></ul></div>
+  <div class="guide" data-guide="india" hidden><h3>Doctors trained in India</h3>
+   <p>India is not on the list of 29 comparable countries, so the usual route is NZREX Clinical. Recent practice in a listed country, with 33 of the last 48 months, may open the comparable pathway.</p>
+   <ul><li>Check your medical school and graduation year in the World Directory of Medical Schools.</li><li>Pass a prerequisite exam, such as PLAB Part 1, MCCQE Part I, AMC MCQ or USMLE Steps 1 and 2 CK.</li><li>Take IELTS Academic or OET Medicine. Many Indian-trained doctors study in English, but the exemption needs the degree taught entirely in English in specific countries, so check the rule.</li><li>Start EPIC verification early.</li></ul></div>
+  <div class="guide" data-guide="usa" hidden><h3>Doctors trained or practising in the USA and Canada</h3>
+   <p>The USA and Canada are both on the list of 29. With at least 33 of the last 48 months of recent practice, 20 or more hours a week and current full registration, the comparable pathway may apply without the NZREX Clinical exam.</p>
+   <ul><li>GPs with an ABFM or CCFP qualification may be eligible for the GP fast-track. Confirm this with the RNZCGP.</li><li>English may be exempt if your degree was taught entirely in English in a listed country.</li><li>Ask the RNZCGP about the ACLS requirement.</li><li>Arrange a certificate of current professional standing from your state or provincial regulator.</li></ul></div>
+  <div class="guide" data-guide="europe" hidden><h3>Doctors trained in Europe, the UK and Ireland</h3>
+   <p>Many European countries are on the list of 29, including the UK, Ireland, Germany, France, Spain, Italy and the Netherlands. Countries such as Poland, Romania and Hungary are not, so doctors trained there usually need NZREX Clinical unless they have practised recently in a listed country.</p>
+   <ul><li>UK MRCGP or FRCGP and Irish MICGP are recognised GP qualifications in the RNZCGP lists.</li><li>English requirements still apply unless you qualify for an exemption.</li><li>Keep records of your hours and months of practice for the last four years.</li></ul></div>
+  <div class="row" style="margin-top:24px"><button class="btn primary" type="button" data-go="check" data-start>Check my own pathway</button></div>
+
+  <h2 style="margin-top:44px">Terms used on this site</h2>
+  <div class="faq">
+   <details><summary>MCNZ</summary><p class="mute">The Medical Council of New Zealand. It decides who can register to practise medicine.</p></details>
+   <details><summary>NZREX Clinical</summary><p class="mute">The clinical exam MCNZ uses for doctors who do not qualify through another route.</p></details>
+   <details><summary>EPIC and ECFMG</summary><p class="mute">EPIC is the service that checks your qualifications directly with the school that issued them. It is run by ECFMG.</p></details>
+   <details><summary>World Directory of Medical Schools (WDOMS)</summary><p class="mute">A list of medical schools. MCNZ needs your school to be listed with an ECFMG Sponsor Note that covers your graduation year.</p></details>
+   <details><summary>RNZCGP</summary><p class="mute">The Royal New Zealand College of General Practitioners. It runs GP training and recognises GP qualifications.</p></details>
+   <details><summary>Supervision</summary><p class="mute">Working under a named senior doctor for a set period before you can practise independently.</p></details>
+  </div>
+</div></div>
+
+<div data-page="resources" hidden><div class="page">
+  <p class="eyebrow">Resources</p>
+  <h1>Study and preparation resources</h1>
+  <p class="mute">Official and free materials first. Links open the provider's own site in a new tab.</p>
+  <div class="filters">
+   <div><label class="field" for="topic">Topic</label>
+    <select id="topic" style="max-width:260px"><option value="all">All topics</option><option value="verification">Verification</option><option value="english">English tests</option><option value="nzrex">NZREX preparation</option><option value="system">NZ health system</option><option value="culture">Cultural safety</option></select></div>
+   <label class="check"><input type="checkbox" id="onlyMine"> Only show what is on my answer sheet</label>
+   <span class="small mute" id="filtNote"></span>
+  </div>
+  <section class="restopic" data-topic="verification"><h2>Verification</h2><p class="mute">Check your school and verify your degree.</p><div class="grid">
+   <a class="rescard" href="https://www.wdoms.org" target="_blank" rel="noopener"><b>World Directory of Medical Schools</b><span>WDOMS · Free</span></a>
+   <a class="rescard" href="https://www.ecfmg.org/epic/" target="_blank" rel="noopener"><b>EPIC verification service</b><span>ECFMG · Fee applies</span></a></div></section>
+  <section class="restopic" data-topic="english"><h2>English test preparation</h2><p class="mute">MCNZ accepts IELTS Academic and OET Medicine.</p><div class="grid">
+   <a class="rescard" href="https://www.oet.com" target="_blank" rel="noopener"><b>OET Medicine</b><span>OET official site · Sample tests and preparation</span></a>
+   <a class="rescard" href="https://ielts.org" target="_blank" rel="noopener"><b>IELTS Academic</b><span>IELTS official site · Test information and practice</span></a></div></section>
+  <section class="restopic" data-topic="nzrex"><h2>NZREX preparation</h2><p class="mute">Materials from the Medical Council of New Zealand.</p><div class="grid">
+   <a class="rescard" href="https://www.mcnz.org.nz/registration/getting-registered/registration-exam-nzrex/" target="_blank" rel="noopener"><b>NZREX Clinical</b><span>MCNZ · Exam information, handbook and sample material</span></a>
+   <a class="rescard" href="https://www.mcnz.org.nz" target="_blank" rel="noopener"><b>Getting registered</b><span>MCNZ · All registration pathways</span></a></div></section>
+  <section class="restopic" data-topic="system"><h2>NZ health system and practice</h2><p class="mute">How funding, medicines and recertification work.</p><div class="grid">
+   <a class="rescard" href="https://www.health.govt.nz" target="_blank" rel="noopener"><b>New Zealand health system</b><span>Ministry of Health · Free</span></a>
+   <a class="rescard" href="https://www.rnzcgp.org.nz" target="_blank" rel="noopener"><b>GP training and recognition</b><span>RNZCGP · GPEP and overseas qualifications</span></a>
+   <a class="rescard" href="https://bpac.org.nz" target="_blank" rel="noopener"><b>Inpractice recertification</b><span>bpacnz · Free information</span></a></div></section>
+  <section class="restopic" data-topic="culture"><h2>Cultural safety and Te Tiriti</h2><p class="mute">Assessed at every NZREX station, so worth starting early.</p><div class="grid">
+   <a class="rescard" href="https://www.mcnz.org.nz" target="_blank" rel="noopener"><b>Statement on cultural safety</b><span>MCNZ · Search the site for current standards</span></a></div></section>
+  <p class="mute" id="noRes" hidden>Nothing on your answer sheet matches this topic.</p>
+</div></div>
+
+<div data-page="about" hidden><div class="page">
+  <p class="eyebrow">About and help</p>
+  <h1>About MedConnect NZ</h1>
+  <p class="lede mute" style="font-size:18px;max-width:64ch">MedConnect NZ helps overseas-trained doctors, and the practices that may employ them, understand which registration pathway is likely to apply. It explains the rules. It does not decide anything.</p>
+  <h2 style="margin-top:36px">Frequently asked questions</h2>
+  <div class="faq">
+   <details open><summary>Is this the official answer?</summary><p class="mute">No. MCNZ decides registration eligibility. This tool shows the likely pathway and the tasks that follow from your answers.</p></details>
+   <details><summary>What happens to my answers?</summary><p class="mute">They stay in this browser tab. They are not sent to a server and they disappear when you close the tab. Save the PDF from your answer sheet to keep them.</p></details>
+   <details><summary>Why does "Unknown" matter?</summary><p class="mute">If you are not sure about an answer, the requirement is marked Unknown and a task is added to find out. Unknown is never treated as a pass.</p></details>
+   <details><summary>Where does the list of 29 countries come from?</summary><p class="mute">It is the list of comparable health system countries in the MCNZ registration policy. It is not the same as the number of medical schools in the World Directory.</p></details>
+   <details><summary>How current is the information?</summary><p class="mute">Rules were last checked in October 2026. Policies change, so confirm with MCNZ before you apply.</p></details>
+   <details><summary>Can I go back and change an answer?</summary><p class="mute">Yes. Use the Edit links beside your answers, or the Edit my answers button on the answer sheet. Questions that no longer apply are hidden.</p></details>
+  </div>
+  <h2 style="margin-top:36px">Sources and last checked</h2>
+  <div class="src"><table><thead><tr><th>Source</th><th>Used for</th><th>Last checked</th></tr></thead><tbody>
+   <tr><td><a href="https://www.mcnz.org.nz" target="_blank" rel="noopener">Medical Council of New Zealand</a></td><td>Pathways, English requirements, NZREX Clinical, supervision</td><td>October 2026</td></tr>
+   <tr><td><a href="https://www.rnzcgp.org.nz" target="_blank" rel="noopener">RNZCGP</a></td><td>GP training and recognised GP qualifications</td><td>October 2026</td></tr>
+   <tr><td><a href="https://www.wdoms.org" target="_blank" rel="noopener">World Directory of Medical Schools</a></td><td>Medical school listing and ECFMG Sponsor Notes</td><td>October 2026</td></tr>
+  </tbody></table></div>
+  <h2 style="margin-top:36px" id="privacy">Disclaimer and privacy</h2>
+  <div class="disc"><p style="margin:0 0 8px">This site is guidance only and is not legal or immigration advice. The Medical Council of New Zealand decides registration eligibility.</p><p style="margin:0">We do not collect, store or share your answers. There are no accounts and no tracking in this prototype.</p></div>
+  <h2 style="margin-top:36px">Contact</h2>
+  <p>Questions about this prototype: [team email to confirm]. For registration questions, contact the Medical Council of New Zealand directly.</p>
+  <p class="small mute">This site is a prototype built for the ENGE803 Innovation Management course at AUT.</p>
+</div></div>
+
+<footer class="site"><div class="in">
+  <p style="margin:0;max-width:760px">This tool is guidance only. The Medical Council of New Zealand decides registration eligibility.</p>
+  <div class="links"><a href="#about" data-go="about">Sources and last checked</a><a href="#about" data-go="about">Disclaimer and privacy</a><a href="#about" data-go="about">FAQ</a><a href="#about" data-go="about">Contact</a></div>
+</div></footer>
+
+
+<script>
+(function(){
+const COUNTRIES="Afghanistan|Albania|Algeria|Andorra|Angola|Antigua and Barbuda|Argentina|Armenia|Australia|Austria|Azerbaijan|Bahamas|Bahrain|Bangladesh|Barbados|Belarus|Belgium|Belize|Benin|Bhutan|Bolivia|Bosnia and Herzegovina|Botswana|Brazil|Brunei|Bulgaria|Burkina Faso|Burundi|Cabo Verde|Cambodia|Cameroon|Canada|Central African Republic|Chad|Chile|China|Colombia|Comoros|Congo|Costa Rica|Croatia|Cuba|Cyprus|Czech Republic|Democratic Republic of the Congo|Denmark|Djibouti|Dominica|Dominican Republic|Ecuador|Egypt|El Salvador|Equatorial Guinea|Eritrea|Estonia|Eswatini|Ethiopia|Fiji|Finland|France|Gabon|Gambia|Georgia|Germany|Ghana|Greece|Grenada|Guatemala|Guinea|Guinea-Bissau|Guyana|Haiti|Honduras|Hong Kong|Hungary|Iceland|India|Indonesia|Iran|Iraq|Ireland|Israel|Italy|Ivory Coast|Jamaica|Japan|Jordan|Kazakhstan|Kenya|Kiribati|Kosovo|Kuwait|Kyrgyzstan|Laos|Latvia|Lebanon|Lesotho|Liberia|Libya|Liechtenstein|Lithuania|Luxembourg|Madagascar|Malawi|Malaysia|Maldives|Mali|Malta|Marshall Islands|Mauritania|Mauritius|Mexico|Micronesia|Moldova|Monaco|Mongolia|Montenegro|Morocco|Mozambique|Myanmar|Namibia|Nauru|Nepal|Netherlands|New Zealand|Nicaragua|Niger|Nigeria|North Korea|North Macedonia|Norway|Oman|Pakistan|Palau|Palestine|Panama|Papua New Guinea|Paraguay|Peru|Philippines|Poland|Portugal|Qatar|Romania|Russia|Rwanda|Saint Kitts and Nevis|Saint Lucia|Saint Vincent and the Grenadines|Samoa|San Marino|Sao Tome and Principe|Saudi Arabia|Senegal|Serbia|Seychelles|Sierra Leone|Singapore|Slovakia|Slovenia|Solomon Islands|Somalia|South Africa|South Korea|South Sudan|Spain|Sri Lanka|Sudan|Suriname|Sweden|Switzerland|Syria|Taiwan|Tajikistan|Tanzania|Thailand|Timor-Leste|Togo|Tonga|Trinidad and Tobago|Tunisia|Turkey|Turkmenistan|Tuvalu|Uganda|Ukraine|United Arab Emirates|United Kingdom|United States|Uruguay|Uzbekistan|Vanuatu|Vatican City|Venezuela|Vietnam|Yemen|Zambia|Zimbabwe".split("|");
+const COMPARABLE=new Set("Australia|Austria|Belgium|Canada|Chile|Czech Republic|Denmark|Finland|France|Germany|Greece|Hong Kong|Iceland|Israel|Italy|Japan|Luxembourg|Norway|Portugal|Croatia|Ireland|South Korea|Singapore|Spain|Sweden|Switzerland|Netherlands|United Kingdom|United States".split("|"));
+const GPQ=["MRCGP / FRCGP (UK)","MICGP (Ireland)","ABFM diplomate (USA)","CCFP (Canada)","MMed Family Medicine (Singapore)","FRACGP or FACRRM (Australia)","FHKCFP (Hong Kong)","Netherlands GP certificate","Belgium GP diploma","France DES Medecine Generale","Sweden GP specialist","FCFP-SA (South Africa)","Other"];
+const EXAMS=["PLAB Part 1","MCCQE Part I","AMC MCQ","USMLE Steps 1 and 2 CK","None of these"];
+const YEAR=new Date().getFullYear();
+const YN=["Yes","No"], YNS=["Yes","No","Not sure"];
+
+const Q=[
+{id:1,stage:"Warm-up",t:"Which country do you currently live in?",type:"country",short:"Country of residence",why:"Some options are for doctors already living in New Zealand. Your answer never stops the check."},
+{id:2,stage:"Degree",t:"What is your primary medical degree?",type:"select",opts:[["MBBS","MBBS"],["MD","MD"],["MBChB","MBChB"],["other","Other (type it)"],["none","I do not have a primary medical degree"]],short:"Primary degree",why:"MCNZ registers doctors who hold a primary medical qualification."},
+{id:3,stage:"Degree",t:"In which country did you study medicine?",type:"country",short:"Country of study",why:"Starts the check of your degree."},
+{id:4,stage:"Degree",t:"What is the name of your medical school?",type:"text",short:"Medical school",why:"Used for the directory check in question 6."},
+{id:5,stage:"Degree",t:"In what year did you graduate?",type:"number",min:1950,max:YEAR,ph:"e.g. 2012",unit:"",short:"Graduation year",why:"The ECFMG Sponsor Note in the directory covers specific graduation years."},
+{id:6,stage:"Degree",t:"Is your school listed in the World Directory of Medical Schools with an ECFMG Sponsor Note covering your graduation year?",type:"buttons",opts:YNS,short:"School in directory",link:["https://www.wdoms.org","Open the World Directory of Medical Schools"],why:"MCNZ accepts primary medical degrees from schools in the directory with a Sponsor Note for your graduation year."},
+{id:7,stage:"Recent practice",t:"How many of the past 48 months (4 years) have you practised medicine clinically?",type:"number",min:0,max:48,ph:"e.g. 36",unit:"months",unsure:true,label:"Months practised (0 to 48)",help:"Count months where you worked with patients, not study or research time. A rough number is fine.",short:"Months practised (of 48)",why:"Doctors with at least 33 months of recent practice in a recognised country may qualify for a faster route."},
+{id:8,stage:"Recent practice",t:"In which country did you do most of that work?",type:"country",short:"Country of recent work",show:a=>a[7]!==undefined&&(a[7]==="unsure"||Number(a[7])>0),why:"The faster route applies to 29 countries with a comparable health system."},
+{id:9,stage:"Recent practice",t:"On average, how many hours per week did you work?",type:"number",min:0,max:80,ph:"e.g. 40",unit:"hours per week",unsure:true,label:"Hours per week (0 to 80)",short:"Hours per week",show:a=>a[7]!==undefined&&(a[7]==="unsure"||Number(a[7])>0),why:"The faster route needs 20 or more hours per week (30 or more for the GP alternative)."},
+{id:10,stage:"Recent practice",t:"Are you currently fully registered to practise in that country?",type:"buttons",opts:YNS,short:"Currently registered",show:a=>a[7]!==undefined&&(a[7]==="unsure"||Number(a[7])>0),why:"Current full or general registration is required for the faster route."},
+{id:11,stage:"Specialty",t:"What area of medicine do you work in?",type:"select",opts:[["gp","General practice / family medicine"],["other","Other specialty (type it)"],["junior","Junior doctor / no specialty yet"]],short:"Area of medicine",why:"Decides whether the GP routes apply."},
+{id:12,stage:"GP training",t:"Do you hold a postgraduate qualification in general practice or family medicine?",type:"buttons",opts:YN,short:"GP qualification",show:a=>a[11]==="gp",why:"A recognised qualification may open a GP fellowship route. Without one, the GP training programme (GPEP) route is shown."},
+{id:13,stage:"GP training",t:"Which qualification do you hold?",type:"gpq",short:"Which GP qualification",show:a=>a[11]==="gp"&&a[12]==="Yes",why:"The Royal New Zealand College of General Practitioners recognises certain programmes (Group 1 or Group 2)."},
+{id:14,stage:"GP training",t:"In what year was it awarded?",type:"number",min:1950,max:YEAR,ph:"e.g. 2020",unit:"",unsure:true,label:"Year awarded",short:"Year awarded",show:a=>a[11]==="gp"&&a[12]==="Yes",why:"A GP qualification awarded within the last 3 years counts as a GP alternative under the faster route."},
+{id:15,stage:"English",t:"Is English your first language?",type:"buttons",opts:YN,short:"English first language",why:"May give an English exemption."},
+{id:16,stage:"English",t:"Was your medical degree taught entirely in English in Australia, the UK, Ireland, the USA, Canada or South Africa?",type:"buttons",opts:YN,short:"Degree taught in English",show:a=>a[15]==="Yes",why:"Training taught entirely in English in those countries gives an English exemption."},
+{id:17,stage:"English",t:"In the past 5 years, have you worked at least 2 years as a registered doctor in a country where English is the first language (including 6 continuous months at one workplace)?",type:"buttons",opts:YNS,short:"2 years English-language work",show:a=>a[15]==="No"||a[16]==="No",why:"This work route gives an English exemption. Two referees are needed."},
+{id:18,stage:"English",t:"Which English test have you taken?",type:"select",opts:[["IELTS","IELTS Academic"],["OET","OET Medicine"],["PTE/TOEFL","PTE or TOEFL"],["None","None yet"]],short:"English test",show:a=>needsTest(a),why:"The MCNZ policy lists IELTS Academic and OET Medicine."},
+{id:19,stage:"English",t:"What were your four scores?",type:"scores",short:"English scores",show:a=>needsTest(a)&&(a[18]==="IELTS"||a[18]==="OET"),why:"Minimums: IELTS 7.0 / 7.0 / 7.0 / 6.5. OET 350 / 350 / 350 / 300 (Speaking / Listening / Reading / Writing)."},
+{id:20,stage:"English",t:"In which month and year did you take the test?",type:"month",short:"Test date",show:a=>needsTest(a)&&(a[18]==="IELTS"||a[18]==="OET"),why:"The result must be within 2 years."},
+{id:21,stage:"Exams",t:"Have you passed any of these exams in the last 5 years?",type:"exam",short:"Prerequisite exam",why:"One of these exams is a prerequisite for the NZREX Clinical exam."},
+{id:22,stage:"Job",t:"Do you have a job offer in New Zealand that includes supervision?",type:"buttons",opts:["Yes","No","I am looking"],short:"NZ job offer with supervision",why:"Needed for comparable-system and fast-track applications, and after NZREX."}
+];
+function needsTest(a){const ex1=a[15]==="Yes"&&a[16]==="Yes";const ex2=(a[15]==="No"||a[16]==="No")&&a[17]==="Yes";return !(ex1||ex2);}
+const byId=Object.fromEntries(Q.map(q=>[q.id,q]));
+
+let S={screen:"intro",qid:1,A:{},done:{},stopMsg:"",stopQ:0};
+const app=document.getElementById("app");
+const A=()=>S.A;
+const vis=q=>!q.show||q.show(S.A);
+const visList=()=>Q.filter(vis);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function valid(q){
+  const a=S.A[q.id];
+  switch(q.type){
+    case"country":case"select":case"gpq":
+      if(!a)return false;
+      if((q.id===2||q.id===11)&&a==="other")return !!(S.A[q.id+"x"]||"").trim();
+      if(q.id===13&&a==="Other")return true;
+      return true;
+    case"text":return !!(a||"").trim();
+    case"buttons":case"month":return !!a;
+    case"number":{if(a==="unsure")return !!q.unsure;if(a===undefined||a==="")return false;const n=Number(a);return Number.isFinite(n)&&n>=q.min&&n<=q.max&&Number.isInteger(n);}
+    case"scores":{if(!a)return false;const mx=S.A[18]==="OET"?500:9;return ["s","l","r","w"].every(k=>a[k]!==""&&a[k]!==undefined&&Number(a[k])>=0&&Number(a[k])<=mx);}
+    case"exam":return !!(a&&a.exam)&&(a.exam==="None of these"||(Number(a.year)>=YEAR-5&&Number(a.year)<=YEAR));
+  }
+  return false;
+}
+function errText(q){
+  if(q.type==="number"&&S.A[q.id]!==undefined&&S.A[q.id]!==""&&S.A[q.id]!=="unsure")return"Enter a whole number from "+q.min+" to "+q.max+".";
+  if(q.type==="exam"&&S.A[q.id]&&S.A[q.id].exam&&S.A[q.id].exam!=="None of these"&&!valid(q))return"Enter the year you passed, between "+(YEAR-5)+" and "+YEAR+".";
+  if(q.type==="scores"&&S.A[q.id]&&!valid(q)&&Object.values(S.A[q.id]).some(v=>v!==""))return S.A[18]==="OET"?"Enter each score from 0 to 500.":"Enter each score from 0 to 9, in steps of 0.5.";
+  return"";
+}
+function show(a,q){
+  const v=a[q.id];
+  if(v===undefined||v==="")return"Not answered";
+  switch(q.type){
+    case"select":{if(q.id===2||q.id===11){if(v==="other")return"Other: "+(a[q.id+"x"]||"");}const o=q.opts.find(o=>o[0]===v);return o?o[1]:v;}
+    case"number":return v==="unsure"?"Not sure":v+(q.unit?" "+q.unit:"");
+    case"scores":return"Speaking "+v.s+", Listening "+v.l+", Reading "+v.r+", Writing "+v.w;
+    case"exam":return v.exam==="None of these"?"None of these":v.exam+" ("+v.year+")";
+    case"month":{const[y,m]=v.split("-");return new Date(y,m-1,1).toLocaleDateString("en-NZ",{month:"long",year:"numeric"});}
+    default:return v;
+  }
+}
+
+/* ---------- evaluation ---------- */
+function evaluate(){
+  const a=S.A,items=[],tasks={now:[],next:[],later:[]};
+  const push=(key,label,status,note)=>items.push({key,label,status,note});
+  let stop="",stopQ=0;
+  if(a[2]==="none"){stop="MCNZ registers doctors who hold a primary medical qualification. Without one, none of the routes in this tool apply.";stopQ=2;}
+  else if(a[6]==="No"){stop="MCNZ needs a primary medical degree from a school listed in the World Directory of Medical Schools with an ECFMG Sponsor Note covering your graduation year. Check the directory again, or contact MCNZ about your school.";stopQ=6;}
+  if(stop)return{stop,stopQ};
+  push("degree","Primary medical degree",a[2]?"doc":"unk",a[2]==="other"?(a[ "2x"]||"Other degree"):a[2]);
+  push("dir","School listed in the World Directory of Medical Schools (ECFMG Sponsor Note)",a[6]==="Yes"?"doc":"unk",a[6]==="Yes"?"You confirmed the school and graduation year ("+a[5]+") are covered.":"You were not sure. Check the directory.");
+  if(a[6]!=="Yes")tasks.now.push(["Check the World Directory of Medical Schools","Look for your school and a Sponsor Note covering "+a[5]+". MCNZ needs this before it accepts your degree.","https://www.wdoms.org"]);
+  const compKeys=[];
+  const m=a[7];
+  if(m==="unsure"){push("months","Recent practice: 33 of the last 48 months","unk","You were not sure.");compKeys.push("months");tasks.now.push(["Work out your months of recent clinical practice","Get employer letters or payslips that show your dates. The faster route needs 33 of the last 48 months.",""]);}
+  else if(Number(m)>=33){push("months","Recent practice: 33 of the last 48 months","doc",m+" months.");compKeys.push("months");}
+  else{push("months","Recent practice: 33 of the last 48 months","mis",m+" months. Under 33 means the faster route is not met.");compKeys.push("months");}
+  if(visList().includes(byId[8])){
+    const c=a[8];
+    push("wcountry","Recent work was in a comparable health system country",COMPARABLE.has(c)?"doc":"mis",c+(COMPARABLE.has(c)?" is on the list of 29.":" is not on the list of 29 comparable countries."));compKeys.push("wcountry");
+    const h=a[9];
+    if(h==="unsure"){push("hours","Hours per week: 20 or more","unk","You were not sure.");tasks.now.push(["Confirm your average weekly hours","The faster route needs 20 or more hours per week (30 or more for the GP alternative).",""]);}
+    else push("hours","Hours per week: 20 or more",Number(h)>=20?"doc":"mis",h+" hours per week.");
+    compKeys.push("hours");
+    const r=a[10];
+    push("reg","Currently fully registered where you work",r==="Yes"?"doc":r==="No"?"mis":"unk",r==="Not sure"?"You were not sure.":r);compKeys.push("reg");
+    if(r==="Not sure")tasks.now.push(["Confirm your current registration status","Get a certificate of current professional standing from your regulator.",""]);
+  }
+  const sts=k=>(items.find(i=>i.key===k)||{}).status;
+  const anyMis=compKeys.some(k=>sts(k)==="mis");
+  const anyUnk=compKeys.some(k=>sts(k)==="unk");
+  const gp=a[11]==="gp";
+  // English
+  let eng="unk",enote="";
+  const ex1=a[15]==="Yes"&&a[16]==="Yes",ex2=(a[15]==="No"||a[16]==="No")&&a[17]==="Yes";
+  if(ex1){eng="doc";enote="Exempt: your degree was taught entirely in English.";}
+  else if(ex2){eng="doc";enote="Exempt through 2 years of English-language work. Two referees are needed.";}
+  else{
+    const t=a[18];
+    if(t==="IELTS"||t==="OET"){
+      const sc=a[19]||{};const mins=t==="IELTS"?{s:7,l:7,r:7,w:6.5}:{s:350,l:350,r:350,w:300};
+      const low=Object.keys(mins).filter(k=>Number(sc[k])<mins[k]);
+      const mo=a[20]?(YEAR*12+new Date().getMonth())-(Number(a[20].split("-")[0])*12+Number(a[20].split("-")[1])-1):0;
+      const old=mo>24;
+      if(low.length||old){eng="mis";enote=t+": "+(low.length?"below the minimum in "+low.map(k=>({s:"Speaking",l:"Listening",r:"Reading",w:"Writing"}[k])).join(", ")+". ":"")+(old?"Test is older than 2 years.":"");}
+      else{eng="doc";enote=t+" scores meet the minimums and the test is within 2 years.";}
+    }else if(t==="PTE/TOEFL"){eng="mis";enote="PTE and TOEFL are not listed in the MCNZ English policy.";}
+    else{eng="mis";enote="No accepted English test yet.";}
+    if(a[17]==="Not sure"&&eng!=="doc"){eng="unk";enote+=" You were also not sure about the work exemption.";}
+  }
+  push("eng","English: IELTS Academic 7.0 / 7.0 / 7.0 / 6.5 or OET 350 / 350 / 350 / 300, or an exemption",eng,enote.trim());
+  if(eng==="mis")tasks.now.push([a[18]==="PTE/TOEFL"?"Book IELTS Academic or OET Medicine":"Book or retake an English test","OET Medicine minimums: 350 / 350 / 350 / 300. IELTS Academic: 7.0 / 7.0 / 7.0 / 6.5. Results are valid for 2 years.","https://www.mcnz.org.nz"]);
+  if(eng==="unk")tasks.now.push(["Check the English work exemption","You need 2 years as a registered doctor in an English-speaking country in the past 5 years, plus two referees.",""]);
+  // GP
+  let gpStatus="na";
+  if(gp){
+    if(a[12]==="Yes"){
+      if(a[13]==="Other"){gpStatus="unk";push("gp","GP qualification recognised by the RNZCGP","unk","\"Other\" needs individual assessment.");tasks.now.push(["Ask the RNZCGP to assess your GP qualification","Qualifications outside the recognised list are assessed individually.",""]);}
+      else{gpStatus="doc";const y=Number(a[14]);push("gp","GP qualification recognised by the RNZCGP","doc",a[13]+(a[14]&&a[14]!=="unsure"?", awarded "+a[14]+(YEAR-y<=3?" (within the last 3 years)":""):"")+". Confirm Group 1 or 2 with the RNZCGP.");tasks.next.push(["Ask the RNZCGP to confirm your qualification","Recognised programmes are in Group 1 or Group 2 of the Prior Specialist Training Pathway.",""]);}
+    }else{gpStatus="mis";push("gp","GP qualification recognised by the RNZCGP","mis","No GP qualification. The GP training programme (GPEP) route applies.");tasks.later.push(["Plan GP training with the RNZCGP (GPEP)","You can apply for the GP training programme after you hold registration and work in an NZ practice.",""]);}
+  }
+  // pathway
+  const comparableMet=!anyMis&&!anyUnk;
+  let pathway;
+  const fast=gp&&a[12]==="Yes"&&["United States","Canada","Singapore"].includes(a[8]);
+  if(comparableMet){pathway={name:"Comparable health system pathway",desc:"You meet each of the checked requirements for the comparable health system route, which does not need the NZREX Clinical exam."+(fast?" As a GP with a qualification from the USA, Canada or Singapore, the GP fast-track may also apply.":"")};}
+  else if(!anyMis){pathway={name:"Comparable health system pathway (to be confirmed)",desc:"You may qualify for the comparable health system route, but some answers are unknown. Complete the Do now tasks to confirm."+(fast?" The GP fast-track may also apply.":"")};}
+  else{pathway={name:"NZREX Clinical route",desc:"Your answers do not meet every requirement for the comparable health system route, so the usual route is the NZREX Clinical exam, followed by supervised practice."+(gp?" GP training with the RNZCGP comes after that.":"")};}
+  const nz=pathway.name.startsWith("NZREX");
+  // exam
+  const ex=a[21];
+  if(nz){
+    const ok=ex&&ex.exam!=="None of these";
+    push("exam","Prerequisite exam passed in the last 5 years (for NZREX Clinical)",ok?"doc":"mis",ok?ex.exam+", "+ex.year+".":"None passed yet.");
+    if(!ok)tasks.now.push(["Pass a prerequisite exam","PLAB Part 1, MCCQE Part I, AMC MCQ or USMLE Steps 1 and 2 CK within the last 5 years.",""]);
+  }else push("exam","Prerequisite exam (for NZREX Clinical)","na","Not needed for the comparable health system route.");
+  // job
+  const j=a[22];
+  push("job","Job offer in New Zealand that includes supervision",j==="Yes"?"doc":"mis",j==="Yes"?"You have an offer.":j==="I am looking"?"You are looking.":"No offer yet.");
+  if(j!=="Yes")tasks.later.push(["Find a supervised New Zealand position","Applications and NZREX follow-on registration need a job with supervision.","https://www.mcnz.org.nz"]);
+  // next
+  tasks.next.unshift(["Start primary source verification (EPIC)","MCNZ checks your degree directly with your school through EPIC, so start early.","https://www.mcnz.org.nz"]);
+  if(nz)tasks.next.push(["Apply for and book NZREX Clinical","Check dates, fees and the candidate handbook on the MCNZ NZREX page.","https://www.mcnz.org.nz/registration/getting-registered/registration-exam-nzrex/"]);
+  else tasks.next.push(["Prepare your MCNZ application","Certificate of current professional standing, referees, CV and verified documents.","https://www.mcnz.org.nz"]);
+  tasks.later.push(["Learn about the NZ health system and cultural safety","Cultural safety and Te Tiriti are assessed at every NZREX station and expected in practice.","https://www.mcnz.org.nz"]);
+  tasks.later.push(["Plan for Inpractice recertification","Doctors in NZ complete the Inpractice recertification programme.",""]);
+  return{items,tasks,pathway};
+}
+
+/* ---------- rendering ---------- */
+function setProgress(){const l=visList();const i=l.findIndex(q=>q.id===S.qid);return{i:i<0?0:i,n:l.length};}
+function sidePanel(mode){
+  const l=visList().filter(q=>S.A[q.id]!==undefined&&S.A[q.id]!==""&&q.id!==S.qid||mode==="review"&&S.A[q.id]!==undefined);
+  let h='<h2 style="font-size:18px;margin:0 0 4px">Your answers so far</h2><p class="small mute">Select Edit to change an answer. Later questions may change.</p><div class="side-list">';
+  if(!l.length)h+='<p class="small mute">Nothing yet. Your answers appear here as you go.</p>';
+  l.forEach(q=>{h+='<div class="ans"><span><span class="q">'+q.id+". "+esc(q.short)+'</span><span class="v">'+esc(show(S.A,q))+'</span></span><button class="link" data-edit="'+q.id+'" aria-label="Edit answer '+q.id+'">Edit</button></div>';});
+  h+="</div>";
+  if(l.length&&mode!=="review")h+='<button class="link" id="seeAll" type="button">See all answers</button>';
+  return h;
+}
+function render(){
+  if(S.screen==="intro")return intro();
+  if(S.screen==="q")return question();
+  if(S.screen==="review")return review();
+  if(S.screen==="stop")return stopScreen();
+  return result();
+}
+function intro(){
+  app.innerHTML='<main style="flex:1 1 100%"><p class="eyebrow">Doctors moving to New Zealand</p><h1>Find out what you need to practise medicine in New Zealand</h1><p class="mute" style="font-size:18px">Answer up to 22 short questions about your degree, recent work, English and exams. You get a likely registration pathway, a list of requirements marked documented, mismatch or unknown, and a step-by-step task list you can save as a PDF.</p>'+
+  '<div class="row" style="margin:20px 0"><button class="btn primary" id="start" type="button">Start the check</button><span class="small mute">About 5 minutes. No account needed.</span></div>'+
+  '<div class="steps"><div class="card"><h3>1. Answer questions</h3><p class="small mute" style="margin:0">One question per screen. Go back and edit any answer at any time.</p></div><div class="card"><h3>2. See your pathway</h3><p class="small mute" style="margin:0">Each requirement is marked Documented, Mismatch or Unknown. Unknown is never treated as a pass.</p></div><div class="card"><h3>3. Follow your task list</h3><p class="small mute" style="margin:0">Tests and steps in order: Do now, Next, Later. Save the answer sheet as a PDF.</p></div></div>'+
+  '<div class="disc"><b>Guidance only.</b> The Medical Council of New Zealand (MCNZ) decides registration eligibility. Your answers stay in this tab and are not sent anywhere. Closing the tab clears them, so save the PDF before you leave. Based on MCNZ rules as at October 2026.</div></main>';
+  document.getElementById("start").onclick=()=>{S.screen="q";S.qid=1;render();window.scrollTo(0,0);};
+}
+function question(){
+  const q=byId[S.qid];const{i,n}=setProgress();const a=S.A[q.id];
+  let inp="";
+  if(q.type==="country"){inp='<label class="field" for="in">Country</label><select id="in"><option value="">Select a country</option>'+COUNTRIES.map(c=>'<option'+(a===c?" selected":"")+'>'+esc(c)+'</option>').join("")+"</select>";}
+  else if(q.type==="select"){inp='<label class="field" for="in">Choose one</label><select id="in"><option value="">Select an option</option>'+q.opts.map(o=>'<option value="'+esc(o[0])+'"'+(a===o[0]?" selected":"")+'>'+esc(o[1])+"</option>").join("")+"</select>";
+    if((q.id===2||q.id===11)&&a==="other")inp+='<div style="margin-top:12px"><label class="field" for="inx">'+(q.id===2?"Your degree":"Your specialty")+'</label><input type="text" id="inx" value="'+esc(S.A[q.id+"x"]||"")+'"></div>';}
+  else if(q.type==="gpq"){inp='<label class="field" for="in">Qualification</label><select id="in"><option value="">Select a qualification</option>'+GPQ.map(c=>'<option'+(a===c?" selected":"")+'>'+esc(c)+"</option>").join("")+"</select>";}
+  else if(q.type==="text"){inp='<label class="field" for="in">School name</label><input type="text" id="in" value="'+esc(a||"")+'" autocomplete="off">';}
+  else if(q.type==="number"){inp='<label class="field" for="in">'+esc(q.label||"Enter a number")+'</label><div class="row"><input type="number" id="in" inputmode="numeric" min="'+q.min+'" max="'+q.max+'" placeholder="'+q.ph+'" value="'+(a==="unsure"||a===undefined?"":esc(a))+'"'+(a==="unsure"?" disabled":"")+'>'+(q.unit?'<span class="mute">'+q.unit+"</span>":"")+"</div>"+(q.unsure?'<div><label class="check"><input type="checkbox" id="uns"'+(a==="unsure"?" checked":"")+'> I am not sure</label></div>':"");}
+  else if(q.type==="buttons"){inp='<div class="choices" role="group" aria-label="Answer">'+q.opts.map(o=>'<button type="button" class="choice" aria-pressed="'+(a===o)+'" data-v="'+esc(o)+'">'+esc(o)+"</button>").join("")+"</div>";if(q.link)inp+='<a href="'+q.link[0]+'" target="_blank" rel="noopener">'+q.link[1]+" (opens in a new tab)</a>";}
+  else if(q.type==="scores"){const o=S.A[18]==="OET";const v=a||{s:"",l:"",r:"",w:""};inp='<p class="small mute">'+(o?"OET Medicine, each skill 0 to 500.":"IELTS Academic, each skill 0 to 9 in steps of 0.5.")+'</p><div class="scores">'+[["s","Speaking"],["l","Listening"],["r","Reading"],["w","Writing"]].map(([k,l])=>'<div><label class="field" for="sc'+k+'">'+l+'</label><input type="number" id="sc'+k+'" data-k="'+k+'" step="'+(o?1:.5)+'" min="0" max="'+(o?500:9)+'" value="'+esc(v[k])+'"></div>').join("")+"</div>";}
+  else if(q.type==="month"){inp='<label class="field" for="in">Month and year</label><input type="month" id="in" max="'+YEAR+"-12"+'" value="'+esc(a||"")+'">';}
+  else if(q.type==="exam"){const v=a||{exam:"",year:""};inp='<label class="field" for="in">Exam</label><select id="in"><option value="">Select an exam</option>'+EXAMS.map(c=>'<option'+(v.exam===c?" selected":"")+'>'+esc(c)+"</option>").join("")+'</select><div id="yr" style="margin-top:12px"'+(v.exam&&v.exam!=="None of these"?"":" hidden")+'><label class="field" for="yin">Year passed</label><input type="number" id="yin" min="'+(YEAR-5)+'" max="'+YEAR+'" placeholder="e.g. '+(YEAR-2)+'" value="'+esc(v.year)+'"></div>';}
+  app.innerHTML='<main><p class="small mute" style="margin:0 0 8px">Question '+(i+1)+" of "+n+" · "+esc(q.stage)+'</p><div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="'+n+'" aria-valuenow="'+(i+1)+'" aria-label="Quiz progress"><div style="width:'+Math.round((i+1)/n*100)+'%"></div></div>'+
+   '<h1>'+esc(q.t)+"</h1>"+(q.help?'<p class="mute">'+esc(q.help)+"</p>":"")+'<div style="margin:20px 0 4px">'+inp+'</div><p class="err" id="err" role="alert"></p>'+
+   '<details><summary>Why are we asking this?</summary><p class="mute" style="margin-top:8px">'+esc(q.why)+'</p></details>'+
+   '<div class="row"><button class="btn" id="back" type="button"'+(i===0?" disabled":"")+'>Back</button><button class="btn primary" id="next" type="button">'+(i===n-1?"Review answers":"Next")+'</button></div></main><aside id="side">'+sidePanel("q")+"</aside>";
+  const next=document.getElementById("next"),err=document.getElementById("err");
+  const refresh=()=>{next.disabled=!valid(q);err.textContent=errText(q);};
+  const set=v=>{S.A[q.id]=v;};
+  const inEl=document.getElementById("in");
+  if(q.type==="country"||q.type==="gpq"){inEl.onchange=()=>{set(inEl.value);refresh();};}
+  else if(q.type==="select"){inEl.onchange=()=>{set(inEl.value);if(q.id===2||q.id===11)question();else refresh();};const x=document.getElementById("inx");if(x)x.oninput=()=>{S.A[q.id+"x"]=x.value;refresh();};}
+  else if(q.type==="text"){inEl.oninput=()=>{set(inEl.value);refresh();};}
+  else if(q.type==="number"){inEl.oninput=()=>{set(inEl.value);refresh();};const u=document.getElementById("uns");if(u)u.onchange=()=>{if(u.checked){set("unsure");inEl.value="";inEl.disabled=true;}else{delete S.A[q.id];inEl.disabled=false;inEl.focus();}refresh();};}
+  else if(q.type==="buttons"){app.querySelectorAll(".choice").forEach(b=>b.onclick=()=>{set(b.dataset.v);app.querySelectorAll(".choice").forEach(c=>c.setAttribute("aria-pressed",c===b));refresh();});}
+  else if(q.type==="scores"){app.querySelectorAll(".scores input").forEach(el=>el.oninput=()=>{const v=Object.assign({s:"",l:"",r:"",w:""},S.A[q.id]);v[el.dataset.k]=el.value;set(v);refresh();});}
+  else if(q.type==="month"){inEl.onchange=()=>{set(inEl.value);refresh();};}
+  else if(q.type==="exam"){const y=document.getElementById("yin"),yr=document.getElementById("yr");inEl.onchange=()=>{const v=Object.assign({exam:"",year:""},S.A[q.id]);v.exam=inEl.value;if(v.exam==="None of these")v.year="";set(v);yr.hidden=!(v.exam&&v.exam!=="None of these");refresh();};y.oninput=()=>{const v=Object.assign({exam:"",year:""},S.A[q.id]);v.year=y.value;set(v);refresh();};}
+  refresh();if(q.type==="number"&&errText(q)==="")err.textContent="";
+  document.getElementById("next").onclick=()=>goNext();
+  document.getElementById("back").onclick=()=>goBack();
+  bindSide();
+  const f=inEl||app.querySelector(".choice");if(f&&q.type!=="buttons")f.focus({preventScroll:true});
+}
+function bindSide(){
+  app.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{S.qid=Number(b.dataset.edit);S.screen="q";render();window.scrollTo(0,0);});
+  const s=document.getElementById("seeAll");if(s)s.onclick=()=>{S.screen="review";render();window.scrollTo(0,0);};
+}
+function checkStop(){
+  const e=evaluate();if(e.stop){S.stopMsg=e.stop;S.stopQ=e.stopQ;S.screen="stop";return true;}return false;
+}
+function goNext(){
+  const q=byId[S.qid];if(!valid(q))return;
+  if((S.qid===2&&S.A[2]==="none")||(S.qid===6&&S.A[6]==="No")){checkStop();render();window.scrollTo(0,0);return;}
+  const l=visList();const i=l.findIndex(x=>x.id===S.qid);
+  if(i>=l.length-1){S.screen="review";}else S.qid=l[i+1].id;
+  render();window.scrollTo(0,0);
+}
+function goBack(){const l=visList();const i=l.findIndex(x=>x.id===S.qid);if(i>0){S.qid=l[i-1].id;render();window.scrollTo(0,0);}}
+function review(){
+  const l=visList();
+  const missing=l.filter(q=>!valid(q));
+  let h='<main><p class="eyebrow">Review</p><h1>Check your answers</h1><p class="mute">Select Edit to change anything. Questions that no longer apply are hidden.</p><div class="table">';
+  l.forEach(q=>{h+='<div class="trow"><div class="t"><span class="n">'+q.id+". "+esc(q.t)+'</span>'+esc(show(S.A,q))+'</div><button class="link" data-edit="'+q.id+'">Edit</button></div>';});
+  h+='</div>'+(missing.length?'<p class="err">Answer question '+missing[0].id+' to continue.</p>':"")+'<div class="row"><button class="btn" id="lastq" type="button">Back to questions</button><button class="btn primary" id="seeSheet" type="button"'+(missing.length?" disabled":"")+'>See my answer sheet</button></div></main>';
+  app.innerHTML=h;bindSide();
+  document.getElementById("lastq").onclick=()=>{S.qid=l[l.length-1].id;S.screen="q";render();};
+  document.getElementById("seeSheet").onclick=()=>{if(!checkStop()){S.screen="result";}render();window.scrollTo(0,0);};
+}
+function stopScreen(){
+  app.innerHTML='<main style="flex:1 1 100%"><div class="stop"><p class="eyebrow" style="color:var(--bad)">We cannot continue</p><h1>This pathway check stops here</h1><p>'+esc(S.stopMsg)+'</p><div class="row"><button class="btn primary" id="chg" type="button">Change my answer</button>'+(S.stopQ===6?'<a href="https://www.wdoms.org" target="_blank" rel="noopener">Open the World Directory of Medical Schools</a>':"")+'</div></div><p class="small mute" style="margin-top:16px">This tool is guidance only. Contact the Medical Council of New Zealand if you think this is wrong for your case.</p></main>';
+  document.getElementById("chg").onclick=()=>{S.qid=S.stopQ;S.screen="q";render();};
+}
+const LABEL={doc:"✓ Documented",mis:"✕ Mismatch",unk:"? Unknown",na:"Not required"};
+function result(){
+  const e=evaluate();if(e.stop){S.screen="stop";return stopScreen();}
+  const c={doc:0,mis:0,unk:0};e.items.forEach(i=>{if(c[i.status]!==undefined)c[i.status]++;});
+  let h='<main style="flex:1 1 100%"><div class="row" style="justify-content:space-between;margin-bottom:20px"><div><p class="eyebrow">Your answer sheet</p><h1 style="margin:0">Your pathway and tasks</h1></div><div class="row"><button class="btn" id="edit" type="button">Edit my answers</button><button class="btn primary" id="pdf" type="button">Save as PDF</button></div></div><p class="toast" id="toast" role="status"></p>';
+  h+='<div class="hero"><p class="eyebrow" style="color:var(--accent)">Most likely pathway</p><h2>'+esc(e.pathway.name)+'</h2><p>'+esc(e.pathway.desc)+' MCNZ makes the final decision.</p><div class="row"><span class="pill doc">'+c.doc+' documented</span><span class="pill mis">'+c.mis+' mismatch</span><span class="pill unk">'+c.unk+' unknown</span></div></div>';
+  h+='<h2>Requirements checked</h2><div class="table">'+e.items.map(i=>'<div class="trow"><div class="t">'+esc(i.label)+'<span class="n">'+esc(i.note)+'</span></div><span class="pill '+i.status+'">'+LABEL[i.status]+"</span></div>").join("")+"</div>";
+  h+='<h2>Your task roadmap</h2><div class="road">';
+  [["now","Do now"],["next","Next"],["later","Later"]].forEach(([k,t])=>{h+='<div class="col"><h3>'+t+"</h3>"+(e.tasks[k].length?e.tasks[k].map((x,i)=>{const id=k+i+x[0];return'<div class="task"><input type="checkbox" id="t_'+k+i+'" data-tid="'+esc(id)+'"'+(S.done[id]?" checked":"")+'><label for="t_'+k+i+'"><b>'+esc(x[0])+"</b><span>"+esc(x[1])+"</span>"+(x[2]?'<br><a class="small" href="'+x[2]+'" target="_blank" rel="noopener">Open resource</a>':"")+"</label></div>";}).join(""):'<p class="small mute" style="margin-top:8px">Nothing here.</p>')+"</div>";});
+  h+='</div><div class="disc">This answer sheet is guidance only. The Medical Council of New Zealand decides registration eligibility. Based on MCNZ rules as at October 2026. Check the MCNZ website before you act.</div><div class="row" style="margin-top:20px"><button class="link" id="again" type="button">Start again</button></div></main>';
+  app.innerHTML=h;
+  document.getElementById("edit").onclick=()=>{S.screen="review";render();window.scrollTo(0,0);};
+  document.getElementById("again").onclick=()=>{S={screen:"intro",qid:1,A:{},done:{},stopMsg:"",stopQ:0};render();};
+  app.querySelectorAll("[data-tid]").forEach(el=>el.onchange=()=>{S.done[el.dataset.tid]=el.checked;});
+  document.getElementById("pdf").onclick=()=>makePdf(e);
+}
+async function makePdf(e){
+  const t=document.getElementById("toast");
+  let dl=null;try{dl=await claude.use("downloads");}catch(x){}
+  if(!window.jspdf){t.textContent="The PDF tool did not load. Check your connection and try again.";return;}
+  const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"});
+  const W=180,L=15;let y=18;
+  const need=h=>{if(y+h>282){doc.addPage();y=18;}};
+  const line=(txt,size,bold,ind,col)=>{doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(size);doc.setTextColor.apply(doc,col||[31,31,29]);const rows=doc.splitTextToSize(String(txt),W-(ind||0));const lh=size*0.5;rows.forEach(r=>{need(lh);doc.text(r,L+(ind||0),y);y+=lh;});y+=1.5;};
+  line("MedConnect NZ: my pathway and answers",18,true);
+  line("Created "+new Date().toLocaleDateString("en-NZ",{day:"numeric",month:"long",year:"numeric"})+". Guidance only. MCNZ decides registration eligibility.",10,false,0,[92,92,87]);y+=3;
+  line("Most likely pathway",11,true,0,[21,86,176]);line(e.pathway.name,15,true);line(e.pathway.desc,10.5,false);y+=3;
+  line("Requirements checked",13,true);
+  e.items.forEach(i=>{line("["+({doc:"Documented",mis:"Mismatch",unk:"Unknown",na:"Not required"})[i.status]+"] "+i.label,10.5,true);if(i.note)line(i.note,10,false,5,[92,92,87]);});
+  y+=3;line("Task roadmap",13,true);
+  [["now","Do now"],["next","Next"],["later","Later"]].forEach(([k,tl])=>{line(tl,11,true,0,[21,86,176]);e.tasks[k].forEach((x,i)=>{const id=k+i+x[0];line((S.done[id]?"[x] ":"[ ] ")+x[0],10.5,true,3);line(x[1],10,false,10,[92,92,87]);});});
+  y+=3;line("My answers",13,true);
+  visList().forEach(q=>{if(S.A[q.id]===undefined)return;line(q.id+". "+q.t,9.5,false,0,[92,92,87]);line(show(S.A,q),10.5,true,4);});
+  y+=4;line("This document is guidance only. The Medical Council of New Zealand decides registration eligibility. Based on MCNZ rules as at October 2026.",9,false,0,[92,92,87]);
+  if(!dl){try{doc.save("MedConnect-NZ-pathway.pdf");t.textContent="PDF saved.";}catch(err){t.textContent="The PDF could not be saved.";}return;}
+  try{
+    const r=await dl.save({filename:"MedConnect-NZ-pathway.pdf",data:doc.output("arraybuffer")});
+    t.textContent=r&&r.status==="saved"?"PDF saved.":"PDF sent.";
+  }catch(err){t.textContent=err&&err.code==="declined"?"Save cancelled.":"The PDF could not be saved in this view.";}
+}
+window.MC={
+ start(){if(S.screen==="intro"){S.screen="q";S.qid=1;}render();},
+ has(){return Object.keys(S.A).length>0;},
+ hasSheet(){try{return visList().every(valid)&&!evaluate().stop;}catch(e){return false;}},
+ sheet(){S.screen=this.hasSheet()?"result":"review";render();},
+ topics(){if(!this.hasSheet())return null;const e=evaluate();const t={verification:1,system:1,culture:1};const en=e.items.find(i=>i.key==="eng");if(en&&en.status!=="doc")t.english=1;if(e.pathway.name.startsWith("NZREX"))t.nzrex=1;return t;}
+};
+render();
+})();
+</script>
+<script>
+(function(){
+const pages=[...document.querySelectorAll("[data-page]")];
+const links=[...document.querySelectorAll(".nav a")];
+function tab(k){document.querySelectorAll("[data-tab]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===k));document.querySelectorAll("[data-guide]").forEach(g=>g.hidden=g.dataset.guide!==k);}
+function filter(){
+  const t=document.getElementById("topic").value,only=document.getElementById("onlyMine").checked,note=document.getElementById("filtNote");
+  const rel=window.MC&&window.MC.topics();let shown=0;note.textContent="";
+  if(only&&!rel)note.textContent="Finish the check to use this filter.";
+  document.querySelectorAll(".restopic").forEach(s=>{
+    let ok=t==="all"||s.dataset.topic===t;
+    if(ok&&only&&rel)ok=!!rel[s.dataset.topic];
+    s.hidden=!ok;if(ok)shown++;});
+  document.getElementById("noRes").hidden=shown>0;
+}
+function home(){
+  const r=document.getElementById("resume"),b=document.getElementById("resumeBtn");
+  const has=window.MC&&window.MC.has();r.hidden=!has;
+  if(has){const sheet=window.MC.hasSheet();b.textContent=sheet?"Open my answer sheet":"Continue the check";if(sheet)b.setAttribute("data-sheet","");else b.removeAttribute("data-sheet");}
+}
+function go(p,o){
+  o=o||{};if(!pages.some(x=>x.dataset.page===p))p="home";
+  pages.forEach(x=>x.hidden=x.dataset.page!==p);
+  links.forEach(a=>{if(a.dataset.go===p)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");});
+  if(p==="check"){if(o.start)window.MC.start();else if(o.sheet)window.MC.sheet();}
+  if(p==="home")home();
+  if(p==="resources")filter();
+  if(p==="pathways"&&o.sub)tab(o.sub);
+  try{if(location.hash!=="#"+p)history.replaceState(null,"","#"+p);}catch(e){}
+  window.scrollTo(0,0);
+  document.title=(p==="home"?"MedConnect NZ":"MedConnect NZ · "+({check:"Check my pathway",pathways:"Pathways",resources:"Resources",about:"About and help"})[p]);
+}
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-go]");if(t){e.preventDefault();go(t.dataset.go,{start:t.hasAttribute("data-start"),sheet:t.hasAttribute("data-sheet"),sub:t.dataset.sub});return;}
+  const b=e.target.closest("[data-tab]");if(b)tab(b.dataset.tab);
+});
+document.getElementById("topic").onchange=filter;
+document.getElementById("onlyMine").onchange=filter;
+let h="home";try{h=(location.hash||"#home").slice(1);}catch(e){}
+go(h);
+})();
+</script>
+
+</html>
